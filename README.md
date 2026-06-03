@@ -1,33 +1,57 @@
-# NLP-Projekt
-# Game Recommendation System – NLP & Machine Learning
+# Game Recommendation System – React + FastAPI + Sentence Transformers + RAG
 
-Dieses Projekt implementiert ein **Game Recommendation System** auf Basis klassischer NLP- und Machine-Learning-Verfahren. Nutzer können in einer Streamlit-Web-App ihre Videospielpräferenzen als Freitext eingeben und zusätzlich Genres, Kategorien, Preisgrenzen und Mindestbewertungen auswählen. Das System empfiehlt anschließend passende Steam-Spiele und erklärt die Empfehlungen nachvollziehbar.
+Dieses Projekt ist ein NLP-basiertes **Game Recommendation System** für Steam-Spiele. Nutzerinnen und Nutzer geben eine freie Spielpräferenz ein, wählen optionale Filter und erhalten anschließend erklärbare Spielempfehlungen. Zusätzlich enthält das Projekt ein Feedback-System, dynamisches Clustering und eine RAG-Erklärung für einzelne Spiele.
 
-Das Projekt wurde bewusst **ohne vortrainierte Transformer-Modelle wie Hugging Face oder SentenceTransformers** umgesetzt. Stattdessen werden klassische, gut erklärbare Verfahren wie **TF-IDF**, **SVD/LSA**, **Logistic Regression**, **Cosine Similarity** und **K-Means Clustering** verwendet.
+Die aktuelle Version nutzt:
+
+- **React + Vite** für die Weboberfläche
+- **FastAPI** als Python-Backend
+- **Sentence Transformers** für semantische Suche
+- **Okapi BM25** für konkrete Keyword-Treffer
+- **Logistic Regression** für `passt / passt nicht`
+- **Feedback-Learning** über Daumen hoch / Daumen runter
+- **Dynamisches Clustering** der aktuellen Top-Ergebnisse
+- **RAG-Erklärungen** mit Retrieval-Kontext und optional lokalem LLM über Ollama
 
 ---
 
-## Projektziel
+## 1. Projektidee
 
-Ziel des Projekts ist die Entwicklung eines hybriden Empfehlungssystems, das freie Nutzereingaben mit strukturierten und unstrukturierten Spieldaten kombiniert.
+Ziel des Projekts ist es, aus einer freien Nutzereingabe passende Steam-Spiele zu empfehlen.
 
-Ein Nutzer kann beispielsweise eingeben:
+Beispielhafte Nutzereingabe:
 
 ```text
-I want a dark sci-fi singleplayer game with story and action.
+Ich suche ein düsteres Sci-Fi-Spiel mit Story, Atmosphäre und Rätseln.
 ```
 
-Das System analysiert diese Eingabe und vergleicht sie mit den Spielbeschreibungen, Genres, Kategorien und Tags aus dem Steam-Datensatz. Zusätzlich wird ein trainiertes Klassifikationsmodell verwendet, das bewertet, ob ein Spiel zur Nutzerpräferenz passt.
+Das System kombiniert mehrere Informationsquellen:
+
+1. Spielbeschreibung und Metadaten
+2. Genres, Kategorien und SteamSpy-Tags
+3. positive und negative Steam-Bewertungen
+4. Preis, Spielzeit und Besitzerangaben
+5. gelabelte Trainingsdaten für ein eigenes Klassifikationsmodell
+6. bisheriges Nutzerfeedback
+
+Aus diesen Informationen wird ein finaler Empfehlungsscore berechnet.
 
 ---
 
-## Verwendete Daten
+## 2. Datenbasis
 
-Das Projekt verwendet zwei Steam-Datensätze:
+Das Projekt verwendet drei zentrale Datendateien im Ordner `data/`:
+
+```text
+data/
+├── steam.csv
+├── steam_description_data.csv
+└── labeled_manual.csv
+```
 
 ### `steam.csv`
 
-Diese Datei enthält strukturierte Spieldaten, unter anderem:
+Enthält strukturierte Spielinformationen:
 
 - `appid`
 - `name`
@@ -41,334 +65,567 @@ Diese Datei enthält strukturierte Spieldaten, unter anderem:
 - `positive_ratings`
 - `negative_ratings`
 - `average_playtime`
+- `median_playtime`
 - `owners`
 - `price`
 
 ### `steam_description_data.csv`
 
-Diese Datei enthält textuelle Spielinformationen:
+Enthält Textdaten:
 
 - `steam_appid`
 - `detailed_description`
 - `about_the_game`
 - `short_description`
 
-Die beiden Dateien werden über folgende Schlüssel verbunden:
+Die Verbindung erfolgt über:
 
 ```text
-steam.csv: appid
-steam_description_data.csv: steam_appid
+steam.csv.appid = steam_description_data.csv.steam_appid
 ```
 
----
+### `labeled_manual.csv`
 
-## Projektstruktur
-
-```text
-game_recommender_nlp_project_no_hf/
-│
-├── app.py
-├── run_pipeline.py
-├── requirements.txt
-├── README.md
-│
-├── data/
-│   ├── steam.csv
-│   └── steam_description_data.csv
-│
-├── artifacts/
-│   ├── games_processed.csv
-│   ├── labeled_training_data.csv
-│   ├── tfidf_vectorizer.pkl
-│   ├── lsa_model.pkl
-│   ├── game_lsa_embeddings.npy
-│   ├── preference_classifier.pkl
-│   └── kmeans_model.pkl
-│
-└── src/
-    ├── prepare_data.py
-    ├── create_labels.py
-    ├── train_classifier.py
-    ├── build_lsa_embeddings.py
-    ├── clustering.py
-    ├── recommender.py
-    ├── rag_answer.py
-    └── evaluate.py
-```
-
----
-
-## Installation
-
-### 1. Projektordner öffnen
-
-In PowerShell oder im VS-Code-Terminal:
-
-```powershell
-cd "C:\Users\nikla\OneDrive\Dokumente\Hochschule\6. Semester\NLP\game_recommender_nlp_project_no_hf"
-```
-
-### 2. Virtuelle Umgebung erstellen
-
-```powershell
-python -m venv .venv
-```
-
-Falls `python` nicht funktioniert:
-
-```powershell
-py -m venv .venv
-```
-
-### 3. Virtuelle Umgebung aktivieren
-
-```powershell
-.\.venv\Scripts\activate
-```
-
-Danach sollte im Terminal links `(.venv)` stehen.
-
-### 4. Abhängigkeiten installieren
-
-```powershell
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-```
-
----
-
-## Projekt ausführen
-
-### 1. Komplette Pipeline starten
-
-```powershell
-python run_pipeline.py
-```
-
-Diese Datei führt alle wichtigen Schritte automatisch nacheinander aus:
-
-1. Daten laden und bereinigen
-2. Daten zusammenführen
-3. Trainingslabels erzeugen
-4. Klassifikator trainieren
-5. TF-IDF- und LSA-Vektoren erzeugen
-6. K-Means-Clustering durchführen
-7. Evaluation ausgeben
-
-Nach erfolgreicher Ausführung befinden sich alle erzeugten Dateien im Ordner `artifacts/`.
-
-### 2. Streamlit-App starten
-
-```powershell
-python -m streamlit run app.py
-```
-
-Danach öffnet sich die Web-App normalerweise automatisch im Browser. Falls nicht, kann die angezeigte lokale URL geöffnet werden, zum Beispiel:
-
-```text
-http://localhost:8501
-```
-
----
-
-## Funktionsweise des Systems
-
-Das Empfehlungssystem besteht aus mehreren Komponenten, die gemeinsam den finalen Empfehlungsscore berechnen.
-
-### 1. Datenaufbereitung
-
-In `src/prepare_data.py` werden die beiden CSV-Dateien geladen und über `appid` und `steam_appid` verbunden. Anschließend werden HTML-Tags aus den Beschreibungen entfernt, fehlende Werte behandelt und ein gemeinsamer Spieltext erzeugt.
-
-Der kombinierte Text besteht aus:
-
-- Spielname
-- Genres
-- Kategorien
-- SteamSpy-Tags
-- Kurzbeschreibung
-- ausführlicher Beschreibung
-
-Dieser Text wird als zentrale Grundlage für die NLP-Modelle verwendet.
-
-Zusätzlich werden zwei Scores berechnet:
-
-```text
-rating_score = positive_ratings / (positive_ratings + negative_ratings)
-```
-
-Der `rating_score` dient als bewertungsbasierter Sentiment-Proxy.
-
-Außerdem wird ein `popularity_score` berechnet, der die Anzahl der Bewertungen berücksichtigt.
-
----
-
-## Labeling
-
-Für das supervised Learning wird ein gelabelter Trainingsdatensatz verwendet. Die Struktur lautet:
+Enthält gelabelte Beispiele für supervised learning:
 
 ```text
 user_preference, appid, game_name, game_text, label
 ```
 
-Das Label bedeutet:
+Dabei bedeutet:
 
 ```text
-1 = Spiel passt zur Nutzerpräferenz
-0 = Spiel passt nicht zur Nutzerpräferenz
+label = 1  → Spiel passt zur Nutzerpräferenz
+label = 0  → Spiel passt nicht zur Nutzerpräferenz
 ```
+
+Diese Datei wird zum Trainieren des Logistic-Regression-Klassifikators verwendet.
+
+---
+
+## 3. Projektstruktur
+
+```text
+PROJECT_ROOT/
+│
+├── backend/
+│   ├── __init__.py
+│   └── main.py
+│
+├── data/
+│   ├── steam.csv
+│   ├── steam_description_data.csv
+│   └── labeled_manual.csv
+│
+├── frontend/
+│   ├── index.html
+│   ├── package.json
+│   ├── package-lock.json
+│   └── src/
+│       ├── App.jsx
+│       ├── main.jsx
+│       └── style.css
+│
+├── src/
+│   ├── prepare_data.py
+│   ├── create_labels.py
+│   ├── train_classifier.py
+│   ├── build_sentence_embeddings.py
+│   ├── bm25.py
+│   ├── recommender.py
+│   ├── feedback.py
+│   ├── dynamic_clustering.py
+│   ├── rag_answer.py
+│   └── evaluate.py
+│
+├── artifacts/
+│   ├── games_processed.csv
+│   ├── preference_classifier.pkl
+│   ├── game_sentence_embeddings.npy
+│   ├── embedding_model_name.txt
+│   ├── bm25_index.pkl
+│   ├── feedback_events.csv
+│   └── recommendation_smoke_test.json
+│
+├── tests/
+│   ├── conftest.py
+│   └── test_backend.py
+│
+├── requirements.txt
+├── run_pipeline.py
+├── rebuild_all.ps1
+├── rebuild_all.bat
+├── start_backend.ps1
+├── start_frontend.ps1
+├── start_backend.bat
+├── start_frontend.bat
+└── README.md
+```
+
+---
+
+## 4. Voraussetzungen
+
+Für die React + FastAPI-Version werden Python und Node.js benötigt.
+
+### Benötigte Software
+
+1. **Python 3.10 oder neuer**
+2. **Node.js LTS** inklusive `npm`
+3. **PowerShell** oder ein anderes Terminal
+4. Optional: **Ollama**, wenn echtes generatives RAG mit lokalem LLM genutzt werden soll
+
+### Python prüfen
+
+```powershell
+python --version
+```
+
+oder:
+
+```powershell
+py --version
+```
+
+### Node.js und npm prüfen
+
+```powershell
+node -v
+npm -v
+```
+
+Falls `npm` nicht gefunden wird, muss Node.js LTS installiert werden.
+
+Download:
+
+```text
+https://nodejs.org
+```
+
+Bei der Installation sollte `Add to PATH` aktiviert sein. Danach PowerShell schließen und neu öffnen.
+
+### Ollama optional prüfen
+
+```powershell
+ollama --version
+```
+
+Ollama ist nur nötig, wenn die generative RAG-Erklärung mit lokalem LLM verwendet werden soll. Ohne Ollama funktioniert das Projekt trotzdem mit einer stabilen RAG-Fallback-Erklärung.
+
+---
+
+## 5. Installation und Start
+
+Die folgenden Befehle verwenden allgemein formulierte Pfade. Ersetze `PROJECT_ROOT` durch den Ordner, in dem das Projekt entpackt wurde.
 
 Beispiel:
 
 ```text
-I want a competitive multiplayer shooter + Counter-Strike → 1
-I want a relaxing farming simulation game + Counter-Strike → 0
+PROJECT_ROOT = Pfad/zum/Projektordner/game_recommender_nlp_project_react_hf_v4_nav_rag
 ```
 
-Diese Trainingsdaten ermöglichen es dem Klassifikationsmodell, die Passung zwischen Nutzerpräferenz und Spieltext zu lernen.
+### 5.1 Backend vorbereiten
+
+```powershell
+cd "PFAD_ZUM_PROJEKTORDNER"
+python -m venv .venv
+.\.venv\Scripts\activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+Falls `python` nicht erkannt wird:
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\activate
+py -m pip install --upgrade pip
+py -m pip install -r requirements.txt
+```
+
+### 5.2 Pipeline ausführen
+
+```powershell
+python run_pipeline.py
+```
+
+Die Pipeline erstellt beziehungsweise prüft die benötigten Artefakte:
+
+- bereinigte Spieldaten
+- gelabelte Trainingsdaten
+- Logistic-Regression-Modell
+- Sentence-Transformer-Embeddings
+- BM25-Index
+- Feedback-Datei
+- Smoke-Test
+
+Beim ersten Durchlauf wird das Sentence-Transformer-Modell heruntergeladen. Das kann einige Minuten dauern.
+
+### 5.3 Backend starten
+
+```powershell
+python -m uvicorn backend.main:app --reload
+```
+
+Backend läuft dann unter:
+
+```text
+http://127.0.0.1:8000
+```
+
+API-Dokumentation:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+### 5.4 Frontend starten
+
+Öffne ein zweites Terminal.
+
+```powershell
+cd "PFAD_ZUM_PROJEKTORDNER\frontend"
+npm install
+npm run dev
+```
+
+Die Webseite läuft dann unter:
+
+```text
+http://127.0.0.1:5173
+```
 
 ---
 
-## Verwendete NLP- und ML-Verfahren
+## 6. Schneller Start mit Skripten
 
-### TF-IDF
+Im Projekt liegen zusätzliche Startskripte.
 
-TF-IDF steht für **Term Frequency - Inverse Document Frequency**. Es wandelt Texte in numerische Vektoren um. Dabei werden Begriffe höher gewichtet, die für ein bestimmtes Dokument charakteristisch sind, während sehr häufige allgemeine Wörter weniger Gewicht erhalten.
+### Backend über PowerShell
+
+```powershell
+.\start_backend.ps1
+```
+
+### Frontend über PowerShell
+
+```powershell
+.\start_frontend.ps1
+```
+
+### Backend über Batch
+
+```cmd
+start_backend.bat
+```
+
+### Frontend über Batch
+
+```cmd
+start_frontend.bat
+```
+
+Hinweis: Falls PowerShell-Skripte blockiert werden, kann einmalig ausgeführt werden:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+---
+
+## 7. Verwendetes Hugging-Face-/Sentence-Transformer-Modell
+
+Für die semantische Suche wird folgendes Modell verwendet:
+
+```text
+sentence-transformers/all-MiniLM-L6-v2
+```
+
+Im Code steht es unter anderem in:
+
+```text
+src/build_sentence_embeddings.py
+src/recommender.py
+```
+
+Dieses Modell erzeugt Satz- und Text-Embeddings. Dadurch können Nutzereingaben und Spielbeschreibungen semantisch verglichen werden.
 
 Beispiel:
 
 ```text
-multiplayer, shooter, fps, puzzle, farming, simulation
+Nutzereingabe:
+"Ich suche ein düsteres Sci-Fi-Spiel mit Story."
+
+Spielbeschreibung:
+"A narrative science-fiction adventure with atmospheric exploration."
 ```
 
-TF-IDF erkennt, welche Begriffe für ein Spiel besonders relevant sind. Außerdem werden N-Gramme verwendet, sodass auch Wortkombinationen wie `single player`, `open world` oder `first person` berücksichtigt werden.
+Auch wenn nicht exakt dieselben Wörter vorkommen, kann das Modell eine inhaltliche Nähe erkennen.
+
+Beim ersten Durchlauf lädt `sentence-transformers` das Modell automatisch über den Hugging Face Hub herunter und speichert es lokal im Cache. Eine Warnung zu unauthentifizierten Hugging-Face-Requests ist normalerweise unkritisch. Ein Token ist nur nötig, wenn höhere Downloadlimits oder private Modelle verwendet werden sollen.
 
 ---
 
-### SVD / LSA
+## 8. Logik der Suche
 
-Die TF-IDF-Vektoren sind sehr hochdimensional. Mit **TruncatedSVD** werden diese Vektoren auf weniger Dimensionen reduziert. Dieses Verfahren wird im NLP häufig als **Latent Semantic Analysis** bezeichnet.
+Die Hauptlogik liegt in:
 
-Dadurch entstehen kompaktere Spielvektoren, die latente Themen abbilden können, zum Beispiel:
+```text
+src/recommender.py
+```
 
-- Shooter / Action / FPS
-- Puzzle / Physics / First-Person
-- Strategy / Management / Simulation
-- RPG / Fantasy / Adventure
+Die zentrale Funktion ist:
 
-Diese LSA-Vektoren werden später für die Ähnlichkeitssuche und das Clustering verwendet.
+```python
+def recommend(
+    self,
+    user_query: str,
+    selected_genres=None,
+    selected_categories=None,
+    selected_tags=None,
+    max_price=None,
+    min_rating=0.0,
+    top_n=10,
+    use_feedback=True,
+):
+```
+
+### Ablauf
+
+1. Nutzereingabe wird empfangen.
+2. Sentence Transformer erzeugt ein Query-Embedding.
+3. Das Query-Embedding wird mit allen Spiel-Embeddings verglichen.
+4. BM25 berechnet Keyword-Treffer.
+5. Filter werden angewendet.
+6. Eine Kandidatenmenge wird gebildet.
+7. Der Logistic-Regression-Klassifikator berechnet eine Passwahrscheinlichkeit.
+8. Rating, Popularität und Filterbonus werden ergänzt.
+9. Feedback-Anpassung wird addiert.
+10. Die besten Spiele werden sortiert zurückgegeben.
 
 ---
 
-### Cosine Similarity
+## 9. Sentence Transformers für semantische Suche
 
-Die **Cosine Similarity** misst, wie ähnlich zwei Vektoren sind. Im Projekt wird die Nutzereingabe mit allen Spielvektoren verglichen.
+In `src/build_sentence_embeddings.py` werden alle Spieltexte in Embeddings umgewandelt.
+
+```python
+model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+embeddings = model.encode(texts, normalize_embeddings=True)
+```
+
+In `src/recommender.py` wird die Nutzereingabe ebenfalls eingebettet:
+
+```python
+query_vector = self.embedding_model.encode([query], normalize_embeddings=True)
+semantic_similarity = np.dot(self.vectors, query_vector[0])
+```
+
+Da die Embeddings normalisiert sind, entspricht das Skalarprodukt praktisch einer Cosine Similarity.
+
+---
+
+## 10. Okapi BM25
+
+BM25 ergänzt die semantische Suche durch konkrete Keyword-Treffer.
 
 Beispiel:
 
 ```text
-User Query: I want a sci-fi singleplayer shooter.
-Game: Half-Life 2
-→ hohe Ähnlichkeit
+Suche: "co-op zombie survival"
 ```
 
-Die berechnete Ähnlichkeit heißt im System `semantic_similarity`.
+BM25 gibt Spielen einen Bonus, wenn konkrete Begriffe wie `co-op`, `zombie` oder `survival` im Spieltext vorkommen.
+
+Im Code:
+
+```python
+bm25_raw = self.bm25.score(query)
+bm25_score = minmax_normalize(bm25_raw)
+```
+
+BM25 ist besonders hilfreich, wenn der Nutzer sehr konkrete Begriffe verwendet.
 
 ---
 
-### Logistic Regression
+## 11. Supervised Learning mit gelabelten Daten
 
-Die Logistic Regression ist das supervised ML-Modell des Projekts. Sie bekommt als Eingabe eine Kombination aus Nutzerpräferenz und Spieltext:
+Die Datei `data/labeled_manual.csv` wird zum Trainieren des eigenen Klassifikationsmodells genutzt.
+
+Die Trainingslogik liegt in:
 
 ```text
-User preference: ...
-Game: ...
+src/train_classifier.py
 ```
 
-Das Modell berechnet anschließend die Wahrscheinlichkeit, dass das Spiel zur Nutzerpräferenz passt:
+Aus der gelabelten CSV wird ein Trainingstext gebaut:
+
+```python
+df["input_text"] = (
+    "User preference: " + df["user_preference"].fillna("") +
+    " Game candidate: " + df["game_text"].fillna("")
+)
+```
+
+Das Ziel ist:
+
+```python
+y = df["label"]
+```
+
+Das Modell lernt:
 
 ```text
-classifier_probability = P(label = 1)
+Nutzerpräferenz + Spieltext → passt / passt nicht
 ```
 
-Diese Wahrscheinlichkeit wird in der finalen Empfehlungslogik berücksichtigt.
+Verwendet wird:
 
----
+- TF-IDF für Textfeatures
+- Logistic Regression für binäre Klassifikation
 
-### K-Means Clustering
-
-K-Means ist ein unüberwachtes ML-Verfahren. Es gruppiert ähnliche Spiele anhand ihrer LSA-Vektoren.
-
-Mögliche Cluster können thematisch sein, zum Beispiel:
-
-- Action- und Shooter-Spiele
-- Puzzle-Spiele
-- Strategie- und Management-Spiele
-- RPG- und Fantasy-Spiele
-- Casual- und Indie-Spiele
-
-Die Cluster dienen zur Analyse der Spielstruktur und können zusätzlich in der Web-App oder Dokumentation interpretiert werden.
-
----
-
-## Finaler Empfehlungsscore
-
-Für jedes Spiel werden mehrere Werte berechnet:
-
-- `semantic_similarity`
-- `classifier_probability`
-- `rating_score`
-- `popularity_score`
-- `filter_bonus`
-
-Diese Werte werden zu einem finalen Score kombiniert:
+Das trainierte Modell wird gespeichert als:
 
 ```text
-final_score =
-    0.35 * semantic_similarity
-  + 0.35 * classifier_probability
-  + 0.15 * rating_score
-  + 0.10 * popularity_score
-  + 0.05 * filter_bonus
+artifacts/preference_classifier.pkl
 ```
 
-Die Spiele werden anschließend nach `final_score` absteigend sortiert. Die besten Spiele werden dem Nutzer als Empfehlung angezeigt.
+In der App wird später nicht mehr direkt die CSV genutzt, sondern das trainierte Modell. Es berechnet für jedes Kandidatenspiel:
+
+```text
+classifier_probability
+```
+
+Diese Wahrscheinlichkeit fließt in den finalen Score ein.
 
 ---
 
-## Streamlit-Web-App
+## 12. Finaler Empfehlungsscore
 
-Die Web-App befindet sich in `app.py`.
+Der finale Score kombiniert mehrere Signale:
 
-Der Nutzer kann dort:
+```python
+df["base_score"] = (
+    0.28 * df["text_similarity_score"]
+    + 0.27 * df["classifier_probability"]
+    + 0.15 * df["bm25_score"]
+    + 0.12 * df["bayesian_rating"]
+    + 0.06 * df["popularity_score"]
+    + 0.07 * df["filter_bonus"]
+)
+```
 
-- eine Freitextpräferenz eingeben,
-- Genres auswählen,
-- Kategorien auswählen,
-- einen maximalen Preis festlegen,
-- eine Mindestbewertung auswählen,
-- die Anzahl der Empfehlungen bestimmen.
+Bedeutung:
 
-Für jedes empfohlene Spiel zeigt die App unter anderem:
+| Komponente | Gewicht | Bedeutung |
+|---|---:|---|
+| Sentence-Transformer-Ähnlichkeit | 28 % | Semantische Nähe zwischen Nutzereingabe und Spiel |
+| Klassifikator-Wahrscheinlichkeit | 27 % | Gelerntes `passt / passt nicht` |
+| BM25 | 15 % | konkrete Keyword-Treffer |
+| Bayesian Rating | 12 % | Bewertungsqualität mit Stabilisierung |
+| Popularität | 6 % | Anzahl Bewertungen / Bekanntheit |
+| Filterbonus | 7 % | Treffer bei Genre, Kategorie und Tags |
 
+Danach wird optional Feedback addiert:
+
+```python
+df["final_score"] = (df["base_score"] + df["feedback_adjustment"]).clip(0, 1.2)
+```
+
+---
+
+## 13. Feedback-System
+
+Nutzer können Empfehlungen mit Daumen hoch oder Daumen runter bewerten.
+
+Gespeichert wird in:
+
+```text
+artifacts/feedback_events.csv
+```
+
+Gespeichert werden unter anderem:
+
+- Suchanfrage
+- Spiel-ID
 - Spielname
-- Kurzbeschreibung
-- Genres
-- Kategorien
-- Entwickler
-- Preis
-- Rating-Score
-- semantische Ähnlichkeit
+- Feedbackwert `+1` oder `-1`
+- Rang
+- Score
+- Similarity
+- BM25
 - Klassifikator-Wahrscheinlichkeit
-- finalen Score
-- erklärenden Empfehlungstext
+
+Die Feedback-Logik liegt in:
+
+```text
+src/feedback.py
+```
+
+Der Einfluss wird begrenzt:
+
+```python
+adjustment = (
+    0.08 * np.tanh(query_values / 3.0)
+    + 0.04 * np.tanh(global_values / 6.0)
+)
+```
+
+Das bedeutet:
+
+- Feedback zur gleichen Suche wirkt stärker.
+- Allgemeines Feedback zu einem Spiel wirkt schwächer.
+- `tanh()` verhindert, dass Feedback das Ranking komplett dominiert.
 
 ---
 
-## RAG-artige Erklärung
+## 14. Dynamisches Clustering
 
-Das Projekt verwendet eine einfache, regelbasierte RAG-Logik.
+Das Clustering passiert nach einer Suche und basiert auf den aktuellen Top-Ergebnissen.
 
-RAG bedeutet:
+Die Logik liegt in:
+
+```text
+src/dynamic_clustering.py
+```
+
+Die React-Seite `Clustering` nutzt die Top-100-Kandidaten der letzten Suche.
+
+Der Nutzer kann verschiedene Perspektiven auswählen:
+
+1. Inhalt & Genre
+2. Spielgefühl / Stimmung
+3. Spielmodus
+4. Beliebtheit & Bewertung
+5. Preis & Spielzeit
+6. Geschätzter Grafikaufwand
+
+Das Clustering ist dynamisch:
+
+- Neue Suche → neue Top-100-Kandidaten
+- Neue Perspektive → neue Merkmalsbasis
+- Clusteranzahl wird sinnvoll angepasst
+- Clusterlabels werden nutzerfreundlich benannt
+
+Beispielhafte Cluster:
+
+```text
+Sci-Fi Adventure
+Puzzle & Mystery
+Horror Survival
+Relaxing & Cozy
+Co-op Games
+Budget Picks
+Grafisch eher aufwendig
+```
+
+---
+
+## 15. RAG-Erklärung
+
+Die Spieldetails enthalten eine RAG-Erklärung.
+
+RAG steht für:
 
 ```text
 Retrieval-Augmented Generation
@@ -376,129 +633,211 @@ Retrieval-Augmented Generation
 
 Im Projekt bedeutet das:
 
-1. Das System ruft passende Spiele ab.
-2. Es sammelt relevante Informationen zum Spiel.
-3. Es erzeugt daraus eine Erklärung.
+1. Das System wählt ein empfohlenes Spiel aus.
+2. Ähnliche Spiele werden als zusätzlicher Kontext abgerufen.
+3. Aus Spielinformationen, Scores, Tags, Genres und ähnlichen Spielen wird eine Erklärung erzeugt.
 
-Es wird kein externes LLM verwendet. Die Erklärung basiert ausschließlich auf den berechneten Scores und den vorhandenen Spieldaten.
-
-Beispiel:
+Die Logik liegt in:
 
 ```text
-Das Spiel wird empfohlen, weil es eine hohe semantische Ähnlichkeit zur Eingabe besitzt,
-vom Klassifikator als passend bewertet wurde und eine gute Nutzerbewertung hat.
+src/rag_answer.py
+backend/main.py → /api/explain
 ```
+
+### Standardmodus
+
+Ohne zusätzliches LLM wird eine stabile, datenbasierte RAG-Fallback-Erklärung erzeugt.
+
+Vorteil:
+
+- funktioniert immer
+- keine Zusatzinstallation nötig
+- keine externen API-Kosten
+- Erklärung basiert auf echten Projektdaten
+
+### Optionaler generativer Modus mit Ollama
+
+Wenn ein lokales LLM genutzt werden soll, kann Ollama aktiviert werden.
+
+Modell installieren:
+
+```powershell
+ollama pull llama3.2
+```
+
+Backend mit Ollama starten:
+
+```powershell
+$env:RAG_PROVIDER="ollama"
+$env:OLLAMA_MODEL="llama3.2"
+python -m uvicorn backend.main:app --reload
+```
+
+Dann generiert das lokale LLM eine natürlichere Erklärung aus dem Retrieval-Kontext.
+
+Falls Ollama nicht erreichbar ist, fällt das System automatisch auf den stabilen Fallback zurück.
 
 ---
 
-## Evaluation
+## 16. Frontend-Navigation
 
-Die Evaluation prüft unter anderem:
+Die React-Webseite ist in mehrere Bereiche aufgeteilt:
 
-- Genauigkeit des Klassifikators
-- Precision, Recall und F1-Score
-- Confusion Matrix
-- Beispielanfragen mit Top-N-Empfehlungen
+### Suche & Empfehlungen
 
-Mögliche Testanfragen:
+- Freitextsuche
+- Filter für Genres, Kategorien und Tags
+- Preis- und Bewertungsfilter
+- Top-Empfehlungen
+- Score-Komponenten
+- Feedback-Buttons
+- Spieldetails und RAG-Erklärung
+
+### Clustering
+
+- dynamisches Clustering der letzten Suchergebnisse
+- Perspektivenauswahl
+- Clusterdiagramm
+- Clusterkarten
+- Detailansichten und ähnliche Spiele
+
+### Feedback-Auswertung
+
+- Anzahl Feedbacks
+- positive und negative Bewertungen
+- Positivquote
+- zuletzt bewertete Spiele
+- Top positiv / negativ bewertete Spiele
+
+---
+
+## 17. Tests
+
+Unit Tests liegen im Ordner:
 
 ```text
-I want a competitive multiplayer shooter.
-I want a relaxing farming simulation game.
-I want a story-driven sci-fi singleplayer game.
-I want a puzzle game with first-person gameplay.
-I want a strategy game with management and planning.
+tests/
 ```
 
-Die Empfehlungen können anschließend manuell auf Plausibilität geprüft werden.
+Ausführen:
+
+```powershell
+pytest -q
+```
+
+Die Tests prüfen zentrale Backend-Funktionen und API-nahe Logik.
 
 ---
 
-## Vorteile des Ansatzes
+## 18. Häufige Fehler und Lösungen
 
-- Keine Abhängigkeit von Hugging Face oder Transformer-Modellen
-- Klassische NLP-Verfahren sind gut erklärbar
-- Kombination aus supervised und unsupervised Learning
-- Eigener gelabelter Trainingsdatensatz
-- Verständliche Empfehlungslogik
-- Streamlit-App als benutzerfreundliche Oberfläche
-- RAG-artige Erklärung für transparente Empfehlungen
+### `npm` wird nicht erkannt
+
+Node.js ist nicht installiert oder nicht im PATH.
+
+Lösung:
+
+1. Node.js LTS installieren
+2. PowerShell schließen und neu öffnen
+3. prüfen:
+
+```powershell
+node -v
+npm -v
+```
+
+### Backend zeigt `Not Found`
+
+Die eigentliche Webseite läuft nicht auf Port 8000, sondern auf Port 5173.
+
+```text
+Backend:  http://127.0.0.1:8000
+Frontend: http://127.0.0.1:5173
+```
+
+### Hugging Face Warnung wegen Token
+
+Eine Meldung wie diese ist meist unkritisch:
+
+```text
+Warning: You are sending unauthenticated requests to the HF Hub.
+```
+
+Das Modell kann trotzdem heruntergeladen werden. Ein Token ist nur für höhere Limits oder private Modelle nötig.
+
+### Suche lädt lange beim ersten Start
+
+Beim ersten Start werden Modelle und Artefakte geladen. Danach ist die Suche schneller.
+
+### Weiße Seite im Frontend
+
+Browser hart neu laden:
+
+```text
+STRG + F5
+```
+
+Falls weiterhin leer:
+
+1. Frontend-Terminal auf Fehlermeldungen prüfen
+2. Backend-Terminal auf API-Fehler prüfen
+3. Browser Developer Console öffnen
 
 ---
 
-## Grenzen des Systems
+## 19. Wichtige Befehle im Überblick
 
-- TF-IDF erkennt Synonyme schlechter als moderne Transformer-Modelle
-- Die Qualität des Klassifikators hängt stark von den Labels ab
-- Es gibt keine echten Nutzerinteraktionsdaten
-- Der Rating-Score ist nur ein Proxy für Sentiment
-- K-Means-Cluster sind nicht automatisch semantisch benannt
-- Empfehlungen hängen stark von den vorhandenen Spielbeschreibungen ab
-
----
-
-## Typische Fehler und Lösungen
-
-### `python wurde nicht gefunden`
-
-Statt `python` kann `py` verwendet werden:
+### Backend komplett vorbereiten
 
 ```powershell
-py run_pipeline.py
-py -m streamlit run app.py
-```
-
-### Virtuelle Umgebung kann nicht aktiviert werden
-
-Wenn PowerShell Skripte blockiert:
-
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-```
-
-Danach erneut aktivieren:
-
-```powershell
-.\.venv\Scripts\activate
-```
-
-### `No module named streamlit`
-
-Dann sind die Pakete nicht installiert oder die virtuelle Umgebung ist nicht aktiv:
-
-```powershell
-.\.venv\Scripts\activate
-pip install -r requirements.txt
-python -m streamlit run app.py
-```
-
----
-
-## Beispielhafter Komplettstart
-
-```powershell
-cd "C:\Users\nikla\OneDrive\Dokumente\Hochschule\6. Semester\NLP\game_recommender_nlp_project_no_hf"
-
+cd "PFAD_ZUM_PROJEKTORDNER"
 python -m venv .venv
 .\.venv\Scripts\activate
-
 python -m pip install --upgrade pip
 pip install -r requirements.txt
-
 python run_pipeline.py
-python -m streamlit run app.py
+python -m uvicorn backend.main:app --reload
+```
+
+### Frontend starten
+
+```powershell
+cd "PFAD_ZUM_PROJEKTORDNER\frontend"
+npm install
+npm run dev
+```
+
+### Webseite öffnen
+
+```text
+http://127.0.0.1:5173
+```
+
+### API-Dokumentation öffnen
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+### Tests ausführen
+
+```powershell
+pytest -q
+```
+
+### Optional Ollama-RAG
+
+```powershell
+ollama pull llama3.2
+$env:RAG_PROVIDER="ollama"
+$env:OLLAMA_MODEL="llama3.2"
+python -m uvicorn backend.main:app --reload
 ```
 
 ---
 
-## Fazit
+## 20. Kurzfazit
 
-Das Projekt zeigt, wie ein vollständiges Game Recommendation System mit klassischen NLP- und Machine-Learning-Methoden umgesetzt werden kann. Es kombiniert Textanalyse, Klassifikation, Ähnlichkeitssuche, Clustering, Bewertungsdaten und eine Web-App zu einem nachvollziehbaren hybriden Empfehlungssystem.
+Das Projekt ist ein hybrides Recommendation System. Es kombiniert semantische Suche mit Sentence Transformers, BM25-Keyword-Retrieval, ein eigenes supervised Klassifikationsmodell, Bewertungsdaten, Filterlogik, Nutzerfeedback, dynamisches Clustering und RAG-Erklärungen.
 
-Besonders wichtig ist, dass die finale Empfehlung nicht nur auf einem einzelnen Verfahren basiert, sondern mehrere Signale kombiniert:
-
-```text
-Textähnlichkeit + gelerntes Passungsmodell + Bewertungen + Popularität + Nutzerfilter
-```
-
-Dadurch entsteht ein flexibles und erklärbares System, das für ein NLP-Studienprojekt sehr gut geeignet ist.
+Dadurch entsteht ein System, das nicht nur Spiele empfiehlt, sondern die Empfehlungen auch nachvollziehbar erklärt und interaktiv durch Feedback und Clusteransichten erweitert.
